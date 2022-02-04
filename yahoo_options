@@ -1,0 +1,229 @@
+Sub import_weekly_options()
+
+Range("Z2").Select
+
+
+Application.ScreenUpdating = False
+Application.Calculation = xlCalculationManual
+
+shttp = "https://marketdata.theocc.com/weekly-options?action=download"
+
+Set xmlhttp = CreateObject("MSXML2.XMLHTTP")
+    xmlhttp.Open "GET", shttp, False
+    xmlhttp.Send
+    Theresponse = xmlhttp.ResponseText
+Debug.Print Theresponse
+
+'Set Thereq = CreateObject("WinHttp.WinHttpRequest.5.1")
+'            With Thereq
+'                .Open "GET", sURL, True
+'                .SetClientCertificate WinHttpRequestOption_SelectCertificate
+'                .Send
+'                .WaitForResponse
+'            End With
+'
+            
+    'Debug.Print Theresponse
+   
+   
+    'EFFECTIVE DATE
+   
+    SplitResponse = Split(Theresponse, Chr(10))
+   
+    For i = 0 To UBound(SplitResponse)
+   
+       
+        'Debug.Print i & "i " & SplitResponse(i)
+       
+        If InStr(1, SplitResponse(i), "SYMBOL,") Then Exit For
+       
+    Next i
+   
+   
+     For j = i + 1 To UBound(SplitResponse)
+   
+        'Debug.Print j & "j " & SplitResponse(j)
+       
+        On Error Resume Next
+            ActiveCell.Value = Left(SplitResponse(j), InStr(1, SplitResponse(j), " ") - 1)
+        On Error GoTo 0
+       
+        ActiveCell.Offset(1, 0).Select
+    Next j
+   
+    ActiveCell.Offset(1, 0).Select
+   
+    'ActiveCell.Value = SplitResponse(1)
+   
+   
+    'Columns("E:E").Select
+    ActiveCell.EntireColumn.RemoveDuplicates Columns:=1, Header:=xlYes
+   
+    Application.DisplayAlerts = True
+Application.StatusBar = False
+Application.Calculate
+Application.Calculation = xlCalculationAutomatic
+Application.ScreenUpdating = True
+
+
+End Sub
+
+Sub AllyahooATMoptions()
+
+Application.ScreenUpdating = False
+Application.Calculation = xlCalculationManual
+
+
+Range("Z1").Select
+
+
+Do
+    
+    Cells(ActiveCell.Row + 1, 27).Select
+    Application.StatusBar = ActiveCell.Offset(0, -1).Value
+    DoEvents
+
+
+
+    If ActiveCell.Offset(0, -1).Value = "" Then Exit Do
+    
+    Call yahooATMoptions
+Loop
+
+Application.StatusBar = False
+
+Application.DisplayAlerts = True
+Application.StatusBar = False
+Application.Calculate
+Application.Calculation = xlCalculationAutomatic
+Application.ScreenUpdating = True
+
+
+End Sub
+
+Sub yahooATMoptions()
+
+' sURL = "https://query1.finance.yahoo.com/v7/finance/chart/" & Sheets("Formula").Cells(1, 1).Value & "?range=3d&interval=1d&indicators=quote&includeTimestamps=true"
+
+On Error Resume Next
+
+sURL = "https://query1.finance.yahoo.com/v7/finance/options/" & ActiveCell.Offset(0, -1).Value
+Debug.Print sURL
+
+
+    '    Set oHttpReq = CreateObject("WinHttp.WinHttpRequest.5.1")
+    Set oHttpReq = CreateObject("MSXML2.XMLHTTP")
+    
+
+    With oHttpReq
+        .Open "GET", sURL, False
+        .Send
+        '.WaitForResponse
+    End With
+
+    RawJSON = oHttpReq.ResponseText
+    Set oHttpReq = Nothing
+
+'Debug.Print RawJSON
+
+CallsJSON = Split(RawJSON, """calls"":")
+CallsJSON = CallsJSON(1)
+
+PutsJSON = Split(CallsJSON, """puts"":")
+
+CallsJSON = PutsJSON(0)
+PutsJSON = PutsJSON(1)
+
+splitJSON = Split(CallsJSON, "{""contractSymbol"":")
+
+For i = 0 To UBound(splitJSON)
+    If splitJSON(i) Like "*""inTheMoney"":false*" Then
+        splitJSON(i) = """contractSymbol"":" & splitJSON(i)
+        'Debug.Print splitJSON(i)
+        ActiveCell.Value = splitJSON(i)
+        
+        CallcontractSymbol = Split(splitJSON(i), """contractSymbol"":")
+        CallcontractSymbol = Split(CallcontractSymbol(1), ",")
+        ActiveCell.Value = CallcontractSymbol(0)
+        ActiveCell.Offset(0, 1).Select
+        
+        
+        Callstrike = Split(splitJSON(i), """strike"":")
+        Callstrike = Split(Callstrike(1), ",")
+        ActiveCell.Value = Callstrike(0)
+        ActiveCell.Offset(0, 1).Select
+        
+        CalllastPrice = Split(splitJSON(i), """lastPrice"":")
+        CalllastPrice = Split(CalllastPrice(1), ",")
+        ActiveCell.Value = CalllastPrice(0)
+        ActiveCell.Offset(0, 1).Select
+        
+        Callbid = Split(splitJSON(i), """bid"":")
+        Callbid = Split(Callbid(1), ",")
+        ActiveCell.Value = Callbid(0)
+        ActiveCell.Offset(0, 1).Select
+        
+        Callask = Split(splitJSON(i), """ask"":")
+        Callask = Split(Callask(1), ",")
+        ActiveCell.Value = Callask(0)
+        ActiveCell.Offset(0, 1).Select
+        
+        callexpiration = Split(splitJSON(i), """expiration"":")
+        callexpiration = Split(callexpiration(1), ",")
+        ActiveCell.Value = (callexpiration(0) / 86400) / 1 + CDbl(DateSerial(1970, 1, 1))
+        ActiveCell.NumberFormat = "yyyy/mm/dd;@"
+        ActiveCell.Offset(0, 1).Select
+        Exit For
+    End If
+Next i
+
+ActiveCell.Offset(0, 2).Select
+
+PutsJSON = Split(RawJSON, """puts"":")
+PutsJSON = PutsJSON(1)
+
+splitJSON = Split(PutsJSON, "{""contractSymbol"":")
+For i = 0 To UBound(splitJSON)
+    If splitJSON(i) Like "*""inTheMoney"":true*" Then
+splitJSON(i) = """contractSymbol"":" & splitJSON(i)
+        'Debug.Print splitJSON(i)
+        ActiveCell.Value = splitJSON(i)
+        
+        putcontractSymbol = Split(splitJSON(i), """contractSymbol"":")
+        putcontractSymbol = Split(putcontractSymbol(1), ",")
+        ActiveCell.Value = putcontractSymbol(0)
+        ActiveCell.Offset(0, 1).Select
+        
+        
+        putstrike = Split(splitJSON(i), """strike"":")
+        putstrike = Split(putstrike(1), ",")
+        ActiveCell.Value = putstrike(0)
+        ActiveCell.Offset(0, 1).Select
+        
+        putlastPrice = Split(splitJSON(i), """lastPrice"":")
+        putlastPrice = Split(putlastPrice(1), ",")
+        ActiveCell.Value = putlastPrice(0)
+        ActiveCell.Offset(0, 1).Select
+        
+        putbid = Split(splitJSON(i), """bid"":")
+        putbid = Split(putbid(1), ",")
+        ActiveCell.Value = putbid(0)
+        ActiveCell.Offset(0, 1).Select
+        
+        putask = Split(splitJSON(i), """ask"":")
+        putask = Split(putask(1), ",")
+        ActiveCell.Value = putask(0)
+        ActiveCell.Offset(0, 1).Select
+        
+        putexpiration = Split(splitJSON(i), """expiration"":")
+        putexpiration = Split(putexpiration(1), ",")
+        ActiveCell.Value = (putexpiration(0) / 86400) / 1 + CDbl(DateSerial(1970, 1, 1))
+        ActiveCell.NumberFormat = "yyyy/mm/dd;@"
+        ActiveCell.Offset(0, 1).Select
+        Exit For
+    End If
+Next i
+   
+    
+
+End Sub
