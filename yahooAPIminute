@@ -1,0 +1,103 @@
+Sub yahooAPIminute()
+
+Dim Quotedate As Variant
+
+Application.ScreenUpdating = False
+Application.Calculation = xlCalculationManual
+
+    'https://query1.finance.yahoo.com/v7/finance/quote?symbols=A,AA
+    'https://query1.finance.yahoo.com/v7/finance/options/A
+    'https://query1.finance.yahoo.com/v7/finance/chart/A?range=254d&interval=1d&indicators=quote&includeTimestamps=true
+
+thestock = Sheets("Formula").Cells(1, 1).Value
+Columns("A:H").ClearContents
+Sheets("Formula").Cells(1, 1).Value = thestock
+
+    Set oHttpReq = CreateObject("WinHttp.WinHttpRequest.5.1")
+    'sURL = "https://query1.finance.yahoo.com/v8/finance/chart/[TICKER]?period1=[UNIX TIMESTAMP]&period2=[UNIX TIMESTAMP]&interval=1m&indicators=quote&includeTimestamps=true"
+    surl = "https://query1.finance.yahoo.com/v7/finance/chart/" & Sheets("Formula").Cells(1, 1).Value & "?range=" & Sheets("LIST").Range("D1").Value & "d&interval=1d&indicators=quote&includeTimestamps=true"
+    'sURL = "https://query1.finance.yahoo.com/v7/finance/chart/SPY?range=100d&interval=1h&indicators=quote&includeTimestamps=true"
+    surl = "https://query1.finance.yahoo.com/v7/finance/chart/" & Sheets("Formula").Cells(1, 1).Value & "?range=7d&interval=1m&indicators=quote&includeTimestamps=true"
+
+    With oHttpReq
+        .Open "GET", surl, False
+        .Send
+        .WaitForResponse
+    End With
+
+    RawJSON = oHttpReq.ResponseText
+    Debug.Print RawJSON
+    Set oHttpReq = Nothing
+
+splitJSON = Split(RawJSON, "]")
+
+    Debug.Print "GAP high " & TodayOpen < (PreviousLow * (1 - Range("GAP").Value)) & " " & (Previoushigh * (1 + Range("GAP").Value))
+    Debug.Print "GAP low " & TodayOpen > (Previoushigh * (1 + Range("GAP").Value)) & " " & (PreviousLow * (1 - Range("GAP").Value))
+    Debug.Print "TodayOpen " & TodayOpen
+    Debug.Print thestock & " gap"
+ 
+    For i = 0 To UBound(splitJSON)
+        'Debug.Print splitJSON(i)
+        If InStr(1, splitJSON(i), """timestamp"":") > 0 Then  'Or InStr(1, splitJSON(i), """open"":") > 0 Or InStr(1, splitJSON(i), """high"":") > 0 Or InStr(1, splitJSON(i), """low"":") > 0 Or InStr(1, splitJSON(i), """close"":") > 0 Or InStr(1, splitJSON(i), """volume"":") > 0 Or InStr(1, splitJSON(i), """adjclose"":") > 0 Then
+            SplitColumn = Split(splitJSON(i), ",")
+                For j = 2 To UBound(SplitColumn)
+                    Quotedate = SplitColumn(j)
+                    Quotedate = Round((SplitColumn(j) / 86400) + CDbl(DateSerial(1970, 1, 1)), 6)
+                    'Quotedate = Round((SplitColumn(j) / 86400) + CDbl(DateSerial(1970, 1, 1)) - 0.005, 2)
+                    Sheets("Formula").Cells(j, 1).Value = Quotedate
+                Next j
+        End If
+        If InStr(1, splitJSON(i), """open"":") > 0 Then   ' Or InStr(1, splitJSON(i), """high"":") > 0 Or InStr(1, splitJSON(i), """low"":") > 0 Or InStr(1, splitJSON(i), """close"":") > 0 Or InStr(1, splitJSON(i), """volume"":") > 0 Or InStr(1, splitJSON(i), """adjclose"":") > 0 Then
+            ThisColumn = 2
+            Sheets("Formula").Cells(1, ThisColumn).Value = "open"
+            SplitColumn = Split(splitJSON(i), ",")
+                For j = 2 To UBound(SplitColumn)
+                    Sheets("Formula").Cells(j, ThisColumn).Value = SplitColumn(j)
+                Next j
+        End If
+        If InStr(1, splitJSON(i), """high"":") > 0 Then  '  Or InStr(1, splitJSON(i), """low"":") > 0 Or InStr(1, splitJSON(i), """close"":") > 0 Or InStr(1, splitJSON(i), """volume"":") > 0 Or InStr(1, splitJSON(i), """adjclose"":") > 0 Then
+            ThisColumn = 3
+            Sheets("Formula").Cells(1, ThisColumn).Value = "high"
+            SplitColumn = Split(splitJSON(i), ",")
+                For j = 2 To UBound(SplitColumn)
+                    Sheets("Formula").Cells(j, ThisColumn).Value = SplitColumn(j)
+                Next j
+        End If
+        If InStr(1, splitJSON(i), """low"":") > 0 Then  'Or InStr(1, splitJSON(i), """close"":") > 0 Or InStr(1, splitJSON(i), """volume"":") > 0 Or InStr(1, splitJSON(i), """adjclose"":") > 0 Then
+            ThisColumn = 4
+            Sheets("Formula").Cells(1, ThisColumn).Value = "low"
+            SplitColumn = Split(splitJSON(i), ",")
+                For j = 2 To UBound(SplitColumn)
+                    Sheets("Formula").Cells(j, ThisColumn).Value = SplitColumn(j)
+                Next j
+        End If
+        If InStr(1, splitJSON(i), """close"":") > 0 Then  'Or InStr(1, splitJSON(i), """volume"":") > 0 Or InStr(1, splitJSON(i), """adjclose"":") > 0 Then
+            ThisColumn = 5
+            Sheets("Formula").Cells(1, ThisColumn).Value = "close"
+            SplitColumn = Split(splitJSON(i), ",")
+                For j = 2 To UBound(SplitColumn)
+                    Sheets("Formula").Cells(j, ThisColumn).Value = SplitColumn(j)
+                Next j
+        End If
+        If InStr(1, splitJSON(i), """volume"":") > 0 Then 'Or InStr(1, splitJSON(i), """adjclose"":") > 0 Then
+            ThisColumn = 6
+            Sheets("Formula").Cells(1, ThisColumn).Value = "volume"
+            SplitColumn = Split(splitJSON(i), ",")
+                For j = 2 To UBound(SplitColumn)
+                    Sheets("Formula").Cells(j, ThisColumn).Value = SplitColumn(j)
+                Next j
+        End If
+        If InStr(1, splitJSON(i), """adjclose"":") > 0 Then
+            ThisColumn = 7
+            Sheets("Formula").Cells(1, ThisColumn).Value = "adjclose"
+            SplitColumn = Split(splitJSON(i), ",")
+                For j = 2 To UBound(SplitColumn)
+                    Sheets("Formula").Cells(j, ThisColumn).Value = SplitColumn(j)
+                Next j
+        End If
+    Next i
+
+Application.Calculate
+Application.ScreenUpdating = True
+
+End Sub
